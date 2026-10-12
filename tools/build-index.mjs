@@ -78,7 +78,6 @@ export function writeIndexes(result, out) {
   mkdirSync(join(out, 'v0.1'), { recursive: true });
   for (const tier of TIERS) writeFileSync(join(out, 'v0.1', `${tier}.json`), result.docs[tier].text);
   writeFileSync(join(out, 'index.html'), indexHtml(result));
-  writeFileSync(join(out, '.nojekyll'), '');
 }
 
 async function main() {

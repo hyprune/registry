@@ -19,12 +19,14 @@
 //              repository owner, member or collaborator (the report process).
 //   reverify   status changes, unavailable removals and state/reverify.json, opened by
 //              github-actions[bot] from a reverify/* branch (the re-verification job).
+//   maintenance no entries/, removed/ or state/ file changes (tools, workflows, docs):
+//              nothing to check here; the tool tests and code owner review cover it.
 //
 // Usage:
 //   node tools/check-pr.mjs scope  --base REV [--head REV] --author LOGIN [--association A]
 //                                  [--head-ref BRANCH] --work DIR
 //   node tools/check-pr.mjs fetch  --work DIR
-//   node tools/check-pr.mjs verify --work DIR
+//   node tools/check-pr.mjs verify --work DIR [--expect-offline]
 //   node tools/check-pr.mjs all    --base REV --author LOGIN --work DIR
 // Environment: GITHUB_TOKEN (read-only, API only), HYPRUNE_GITHUB_API / GITHUB_API_URL,
 // HYPRUNE_GITHUB_DOWNLOAD (tests), HYPRUNE_REGISTRY_SDK (built SDK, verify step),
@@ -105,6 +107,7 @@ export function classify(files, { author, association, headRef = '' }) {
     if (bad.length) errors.push(`the re-verification may only change entry status, remove unavailable community entries and update state/reverify.json (not ${bad.map(f => f.path).join(', ')})`);
     return { mode: 'reverify', errors };
   }
+  if (!paths.some(p => /^(entries|removed|state)\//.test(p))) return { mode: 'maintenance', errors };
   const official = paths.filter(p => p.startsWith('entries/official/'));
   if (official.length) errors.push(`entries/official/ changes only through the official sync job (${official.join(', ')})`);
   const removed = files.filter(f => /^removed\/[^/]+\.json$/.test(f.path));
@@ -546,7 +549,7 @@ function print(outcome) {
 
 async function main() {
   const [cmd, ...rest] = process.argv.slice(2);
-  const args = parseArgs(rest);
+  const args = parseArgs(rest, ['expect-offline']);
   const root = resolve(args.root ?? defaultRoot);
   const work = resolve(args.work ?? join(root, '.check'));
   mkdirSync(work, { recursive: true });
@@ -566,6 +569,11 @@ async function main() {
     return;
   }
   if (cmd === 'fetch') { await fetchFacts(readJson(planPath), work); console.log(`downloads in ${work}`); return; }
+  if (cmd === 'verify' && args['expect-offline'] !== undefined) {
+    // The CI runs verify in a network namespace without interfaces; refuse to run otherwise.
+    const reachable = await fetch('https://api.github.com/', { signal: AbortSignal.timeout(5000) }).then(() => true, () => false);
+    if (reachable) { annotate('error', 'verify --expect-offline: the network is reachable'); process.exit(1); }
+  }
   if (cmd === 'verify' || cmd === 'all') {
     const plan = cmd === 'all' ? doScope() : readJson(planPath);
     if (cmd === 'all' && plan.mode) await fetchFacts(plan, work);

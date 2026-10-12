@@ -258,3 +258,8 @@ test('the GitHub token is sent to the API only', needsSdk, async () => {
   } finally { delete process.env.GITHUB_TOKEN; }
 });
 
+
+test('changes outside entries/, removed/ and state/ are maintenance', () => {
+  assert.deepEqual(classify([{ status: 'M', path: 'tools/check-pr.mjs' }, { status: 'M', path: 'README.md' }], { author: 'ada' }), { mode: 'maintenance', errors: [] });
+  assert.match(classify([{ status: 'M', path: 'tools/x.mjs' }, { status: 'A', path: 'entries/community/a.b.json' }], { author: 'ada' }).errors.join(), /exactly one/);
+});
