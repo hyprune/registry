@@ -114,9 +114,12 @@ Official entries are handled in the building repositories as ordinary bug or rig
 | `.github/workflows/sync-official.yml` | Daily and on demand: open a pull request when the meta repository's pins changed. |
 
 Pull requests from the sync and re-verification jobs are opened with the workflow token, so
-those jobs start `check.yml` for their branch themselves. Maintainers merge a community pull
-request only when it changes exactly one `entries/community/<id>.json` file (a pull request
-can change the workflows it runs; those changes need a code owner's review).
+those jobs start `check.yml` for their branch themselves. The checks always run the tools and
+schemas of the base branch and read the pull request's files as data. Changes to `tools/`,
+`schema/` or `.github/` are separate maintenance pull requests that need a code owner's
+review (a pull request can change the workflow it runs), and are refused together with
+entries. Maintainers merge a community pull request only when it changes exactly one
+`entries/community/<id>.json` file.
 
 Each publication's `serial` is the number of commits on `main`, so it only increases.
 

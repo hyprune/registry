@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 // Pull request checks of the community registry (RFC-0015 "Pull request checks", 1-14).
 //
+// The checks are trusted code from the base branch: CI runs this file, the schemas and
+// lib/ from a checkout of the base revision, and reads the repository under check
+// (--root) through git only: the base revision for existing entries and tombstones, the
+// head revision for the changed files, which are parsed as data and never executed.
+//
 // Three steps, so that untrusted archives are only opened without network:
 //   scope   (git only)   which files the change touches and what kind of change it is;
 //                        writes plan.json with the entry checks that need no I/O.
@@ -19,10 +24,11 @@
 //              repository owner, member or collaborator (the report process).
 //   reverify   status changes, unavailable removals and state/reverify.json, opened by
 //              github-actions[bot] from a reverify/* branch (the re-verification job).
-//   maintenance no entries/, removed/ or state/ file changes (tools, workflows, docs):
-//              nothing to check here; the tool tests and code owner review cover it.
+//   maintenance no entries/, removed/ or state/ file changes (tools, schemas, workflows,
+//              docs): nothing to check here; code owner review and the tool tests cover it.
+// Any other change that touches tools/, schema/ or .github/ is refused.
 //
-// Usage:
+// Usage (--root: the repository under check, default this checkout):
 //   node tools/check-pr.mjs scope  --base REV [--head REV] --author LOGIN [--association A]
 //                                  [--head-ref BRANCH] --work DIR
 //   node tools/check-pr.mjs fetch  --work DIR
@@ -49,6 +55,8 @@ export const CHECKS = {
   11: 'Requirements', 12: 'Thumbnails', 13: 'Removed', 14: 'Version history', 0: 'Change scope',
 };
 const BOT = 'github-actions[bot]';
+const PROTECTED = /^(tools|schema|\.github)\//;
+const MAINTENANCE_NOTE = 'maintenance change: no entries to check; it needs a code owner review, and its tools and workflows only take effect once merged';
 const MAINTAINER_ASSOCIATIONS = ['OWNER', 'MEMBER', 'COLLABORATOR'];
 const sha256 = buf => createHash('sha256').update(buf).digest('hex');
 const isPre = v => (parseSemver(v)?.prerelease.length ?? 0) > 0;
@@ -107,7 +115,9 @@ export function classify(files, { author, association, headRef = '' }) {
     if (bad.length) errors.push(`the re-verification may only change entry status, remove unavailable community entries and update state/reverify.json (not ${bad.map(f => f.path).join(', ')})`);
     return { mode: 'reverify', errors };
   }
-  if (!paths.some(p => /^(entries|removed|state)\//.test(p))) return { mode: 'maintenance', errors };
+  if (!paths.some(p => /^(entries|removed|state)\//.test(p))) return { mode: 'maintenance', errors, notes: [MAINTENANCE_NOTE] };
+  const protectedPaths = paths.filter(p => PROTECTED.test(p));
+  if (protectedPaths.length) errors.push(`${protectedPaths.join(', ')}: tools, schemas and workflows change only in a separate maintenance pull request (code owner review), never together with entries`);
   const official = paths.filter(p => p.startsWith('entries/official/'));
   if (official.length) errors.push(`entries/official/ changes only through the official sync job (${official.join(', ')})`);
   const removed = files.filter(f => /^removed\/[^/]+\.json$/.test(f.path));
@@ -131,7 +141,7 @@ export function entryChecks(item, ctx, r) {
   const { entry, previous, tier } = item;
   const where = { item: item.file };
   // 1: schema and file name
-  const problems = validateEntry(entry, { root: ctx.root });
+  const problems = validateEntry(entry, { root: defaultRoot });
   if (basename(item.file) !== `${entry?.id}.json`) problems.push(`file name must be ${entry?.id}.json`);
   if (problems.length) { r.fail(1, problems.join('; '), where); return false; }
   const regErrors = [];
@@ -188,10 +198,11 @@ export function scope({ root, base, head = 'HEAD', author, association, headRef 
   const plan = { mode, base, head: git(root, ['rev-parse', head]).trim(), author, association, headRef, items: [], results: r.list, warnings: [], hints: [] };
   if (errors.length) { for (const e of errors) r.fail(0, e); return plan; }
   r.pass(0, `${mode} change: ${files.map(f => `${f.status} ${f.path}`).join(', ')}`);
+  if (mode === 'maintenance') { plan.hints.push(MAINTENANCE_NOTE); return plan; }
   const ctx = { root, official: entriesAt(root, base, 'official'), community: entriesAt(root, base, 'community'), tombstones: tombstonesAt(root, base) };
   const headTombstones = tombstonesAt(root, head);
   for (const f of files) {
-    if (f.path === 'state/reverify.json') continue;
+    if (!/^(entries\/(official|community)|removed)\/[^/]+\.json$/.test(f.path)) continue;
     if (f.path.startsWith('removed/')) {
       const name = basename(f.path, '.json');
       const t = headTombstones.get(name);
@@ -405,7 +416,7 @@ async function verifyVersion(item, v, vf, plan, sdk, r, warnings, stage) {
   if (v.record) {
     if (!record) d6.push('release record is not JSON');
     else {
-      const rec = validateRecord(record, { root: stage.root });
+      const rec = validateRecord(record, { root: defaultRoot });
       if (rec.length) d6.push(`release record: ${rec.join('; ')}`);
       cmp('record type / entry type', record.type, entry.type);
       cmp('record id / entry id', record.id, entry.id);
@@ -469,14 +480,14 @@ async function verifyVersion(item, v, vf, plan, sdk, r, warnings, stage) {
   rmSync(staging, { recursive: true, force: true });
 }
 
-export async function verify(plan, work, { root = defaultRoot } = {}) {
+export async function verify(plan, work) {
   const r = results();
   r.list.push(...plan.results);
   const warnings = [...plan.warnings], hints = [...plan.hints];
   const facts = plan.items.length ? readJson(join(work, 'facts.json')) : { items: {} };
   const sdk = plan.items.some(i => i.newTags.length) ? await (await import('./lib/sdk.mjs')).loadSdk() : null;
   const tmp = mkdtempSync(join(work, 'staging-'));
-  const stage = { work, tmp, root, worldCheck: worldCheckBinary() };
+  const stage = { work, tmp, worldCheck: worldCheckBinary() };
   try {
     for (const item of plan.items) {
       const f = facts.items[item.file] ?? { versions: {} };
@@ -577,7 +588,7 @@ async function main() {
   if (cmd === 'verify' || cmd === 'all') {
     const plan = cmd === 'all' ? doScope() : readJson(planPath);
     if (cmd === 'all' && plan.mode) await fetchFacts(plan, work);
-    const outcome = await verify(plan, work, { root });
+    const outcome = await verify(plan, work);
     print(outcome);
     if (!outcome.ok) process.exit(1);
     console.log('all checks passed');

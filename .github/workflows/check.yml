@@ -1,5 +1,9 @@
 # Pull request checks (RFC-0015 "Pull request checks"). Runs on pull_request only, never
-# pull_request_target: the pull request's code runs with a read-only token and no secrets.
+# pull_request_target: a read-only token and no secrets. The registry checks run the tools
+# and schemas of the base revision; the pull request contributes only its changed files,
+# read as data. A pull request that changes tools/, schema/ or .github/ is a maintenance
+# change (refused together with entries) and needs a code owner's review; the "tool
+# tests" job runs its own tests.
 # The sync and re-verification jobs dispatch this workflow for their own pull request
 # branches (pull requests opened with GITHUB_TOKEN don't trigger pull_request runs); the
 # check runs then attach to the branch's head commit like any other.
@@ -23,17 +27,34 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      # The change under check: read through git as data only, never executed.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          path: pr
           fetch-depth: 0
           persist-credentials: false
+      # The checks themselves (tools/, schema/) come from the base revision: for a
+      # pull_request run the merge commit's first parent (the base branch as merged),
+      # for a dispatched run the merge base with main. Existing entries and tombstones
+      # are read at that revision too.
+      - name: Check out the base revision
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            base=$(git -C pr rev-parse HEAD^1)
+          else
+            base=$(git -C pr merge-base origin/main HEAD)
+          fi
+          git -C pr worktree add --detach "$RUNNER_TEMP/base" "$base"
+          echo "BASE_REV=$base" >> "$GITHUB_ENV"
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-      - name: Install the tools and the pinned SDK
+      - name: Install the tools and the pinned SDK (base revision)
         run: |
-          npm ci --prefix tools --ignore-scripts --no-audit --no-fund
-          tools/install-sdk.sh "$RUNNER_TEMP/sdk"
+          npm ci --prefix "$RUNNER_TEMP/base/tools" --ignore-scripts --no-audit --no-fund
+          "$RUNNER_TEMP/base/tools/install-sdk.sh" "$RUNNER_TEMP/sdk"
       - name: Scope (git only)
         env:
           EVENT: ${{ github.event_name }}
@@ -43,19 +64,17 @@ jobs:
           ACTOR: ${{ github.actor }}
           REF_NAME: ${{ github.ref_name }}
         run: |
-          # A pull_request run checks out the merge commit: its first parent is the base
-          # branch as merged, so the diff is exactly the pull request's change.
           if [ "$EVENT" = pull_request ]; then
-            base=HEAD^1 author=$PR_AUTHOR association=$PR_ASSOCIATION head_ref=$PR_HEAD_REF
+            author=$PR_AUTHOR association=$PR_ASSOCIATION head_ref=$PR_HEAD_REF
           else
-            base=origin/main author=$ACTOR association=NONE head_ref=$REF_NAME
+            author=$ACTOR association=NONE head_ref=$REF_NAME
           fi
-          node tools/check-pr.mjs scope --base "$base" --author "$author" \
-            --association "$association" --head-ref "$head_ref" --work "$RUNNER_TEMP/check"
+          node "$RUNNER_TEMP/base/tools/check-pr.mjs" scope --root pr --base "$BASE_REV" --head HEAD \
+            --author "$author" --association "$association" --head-ref "$head_ref" --work "$RUNNER_TEMP/check"
       - name: Download (network)
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: node tools/check-pr.mjs fetch --work "$RUNNER_TEMP/check"
+        run: node "$RUNNER_TEMP/base/tools/check-pr.mjs" fetch --root pr --work "$RUNNER_TEMP/check"
       # The archive checks run without network: a new network namespace (loopback only, down)
       # entered as root, then dropped back to the runner user. No token reaches this step.
       - name: Check (no network)
@@ -63,7 +82,8 @@ jobs:
           sudo unshare --net -- setpriv --reuid="$(id -u)" --regid="$(id -g)" --clear-groups -- \
             env -i PATH="$PATH" HOME="$HOME" GITHUB_ACTIONS=true \
               GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" HYPRUNE_REGISTRY_SDK="$RUNNER_TEMP/sdk" \
-            "$(command -v node)" tools/check-pr.mjs verify --work "$RUNNER_TEMP/check" --expect-offline
+            "$(command -v node)" "$RUNNER_TEMP/base/tools/check-pr.mjs" verify --root pr \
+              --work "$RUNNER_TEMP/check" --expect-offline
 
   tools:
     name: tool tests

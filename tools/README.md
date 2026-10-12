@@ -28,10 +28,19 @@ A local SDK checkout works the same way (build it with `npm run build`). `hyprun
 
 ## Pull request checks
 
+In CI the checks are trusted code: `check.yml` checks out the pull request (the merge
+commit) as `pr/`, adds a worktree of the base revision (the merge commit's first parent;
+for dispatched runs the merge base with `main`) and runs `tools/`, `schema/` and the pinned
+SDK from that base revision with `--root pr`. The repository under check is only read
+through git: existing entries and tombstones at the base revision, the changed files at
+the head revision, parsed as JSON. Nothing from the pull request is executed by this job
+(the workflow file itself is the pull request's, which is why `.github/` changes need a
+code owner's review).
+
 ```sh
-node tools/check-pr.mjs scope  --base <base sha> --author <login> [--association A] [--head-ref B] --work DIR
-node tools/check-pr.mjs fetch  --work DIR                     # GitHub API and downloads
-node tools/check-pr.mjs verify --work DIR [--expect-offline]  # everything else, no network
+node tools/check-pr.mjs scope  --root <repo> --base <base rev> --head HEAD --author <login> [--association A] [--head-ref B] --work DIR
+node tools/check-pr.mjs fetch  --root <repo> --work DIR                     # GitHub API and downloads
+node tools/check-pr.mjs verify --root <repo> --work DIR [--expect-offline]  # everything else, no network
 node tools/check-pr.mjs all    --base origin/main --author <login> --work DIR
 ```
 
@@ -43,7 +52,12 @@ node tools/check-pr.mjs all    --base origin/main --author <login> --work DIR
 | official | `entries/official/*.json` | `github-actions[bot]` from a `sync-official/` branch |
 | removal | `entries/community/<id>.json` deleted or reduced, plus `removed/<id>.json` | owner, member or collaborator |
 | reverify | `versions[].status`, unavailable removals with tombstones, `state/reverify.json` | `github-actions[bot]` from a `reverify/` branch |
-| maintenance | nothing under `entries/`, `removed/` or `state/` | anyone (code owner review) |
+| maintenance | nothing under `entries/`, `removed/` or `state/` (tools, schemas, workflows, docs) | anyone; needs a code owner's review |
+
+Changes to `tools/`, `schema/` or `.github/` are only accepted as a maintenance change: a
+pull request that mixes them with entries, tombstones or state fails the scope. A
+maintenance change's own tools take effect after it is merged; the `tool tests` job runs
+its tests.
 
 Only versions that aren't listed yet are downloaded and checked; listed versions are
 compared with the base revision (check 14). CI runs `verify` in a network namespace

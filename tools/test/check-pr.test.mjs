@@ -17,7 +17,7 @@ after(() => gh.close());
 
 const ID = 'io.github.ada.street';
 /** A published release on the fake GitHub plus a registry with the entry change committed. */
-function scenario({ owner = 'ada', repo = 'hyprune-objects-street', id = ID, version = '1.2.0', release = {}, repoInfo = {}, base = {}, entry, mutateEntry, extraFiles, file } = {}) {
+function scenario({ owner = 'ada', repo = 'hyprune-objects-street', id = ID, version = '1.2.0', release = {}, repoInfo = {}, base = {}, entry, mutateEntry, extraFiles, file, prepare } = {}) {
   const rel = makeRelease({ owner, repo, id, version, extra: extraFiles, ...release });
   const key = `${owner}/${repo}`;
   const existing = gh.repos[key];
@@ -28,6 +28,7 @@ function scenario({ owner = 'ada', repo = 'hyprune-objects-street', id = ID, ver
     releases: [...(existing?.releases ?? []).filter(r => r.tag_name !== rel.tag), rel.release],
   };
   const reg = makeRegistry(base);
+  prepare?.(reg);
   const baseRev = reg.git('rev-parse', 'HEAD');
   const e = entry ?? entryFor({ id, owner, repo, versions: [rel.versionEntry] });
   mutateEntry?.(e, rel);
@@ -40,7 +41,7 @@ async function run(s, { author = 'ada', association = 'NONE', headRef = 'add-ent
   const work = tmp('work');
   const plan = scope({ root: s.reg.root, base: s.baseRev, author, association, headRef });
   if (plan.mode && plan.items.length) await fetchFacts(plan, work);
-  const outcome = await verify(plan, work, { root: s.reg.root });
+  const outcome = await verify(plan, work);
   rmSync(work, { recursive: true, force: true });
   outcome.failed = outcome.results.filter(r => !r.ok).map(r => r.check);
   outcome.messages = outcome.results.filter(r => !r.ok).map(r => `${r.check}: ${r.message}`).join('\n');
@@ -260,6 +261,42 @@ test('the GitHub token is sent to the API only', needsSdk, async () => {
 
 
 test('changes outside entries/, removed/ and state/ are maintenance', () => {
-  assert.deepEqual(classify([{ status: 'M', path: 'tools/check-pr.mjs' }, { status: 'M', path: 'README.md' }], { author: 'ada' }), { mode: 'maintenance', errors: [] });
-  assert.match(classify([{ status: 'M', path: 'tools/x.mjs' }, { status: 'A', path: 'entries/community/a.b.json' }], { author: 'ada' }).errors.join(), /exactly one/);
+  const m = classify([{ status: 'M', path: 'tools/check-pr.mjs' }, { status: 'M', path: '.github/workflows/check.yml' }, { status: 'M', path: 'schema/v0.1/index.schema.json' }], { author: 'ada' });
+  assert.equal(m.mode, 'maintenance');
+  assert.deepEqual(m.errors, []);
+  assert.match(m.notes.join(), /code owner review/);
+});
+
+test('tools/, schema/ and .github/ never change together with entries', () => {
+  for (const extra of ['tools/check-pr.mjs', 'schema/v0.1/index.schema.json', '.github/workflows/check.yml']) {
+    const c = classify([{ status: 'M', path: extra }, { status: 'A', path: 'entries/community/a.b.json' }], { author: 'ada' });
+    assert.match(c.errors.join(), new RegExp(`${extra.replace(/[.]/g, '\\.')}: tools, schemas and workflows change only in a separate maintenance pull request`));
+  }
+  const removal = classify([{ status: 'D', path: 'entries/community/a.b.json' }, { status: 'A', path: 'removed/a.b.json' }, { status: 'M', path: 'tools/x.mjs' }], { author: 'm', association: 'MEMBER' });
+  assert.ok(removal.errors.length >= 1);
+  const sync = classify([{ status: 'M', path: 'entries/official/com.hyprune.x.json' }, { status: 'M', path: 'tools/x.mjs' }], { author: 'github-actions[bot]', headRef: 'sync-official/pins' });
+  assert.ok(sync.errors.length >= 1);
+});
+
+test('the checks use their own schemas and read the change through git only', needsSdk, async () => {
+  // The repository under check has no schemas at all, and its working tree differs from
+  // the committed head: neither matters.
+  const s = scenario({ repo: 'hyprune-objects-git', prepare: reg => { reg.git('rm', '-q', '-r', 'schema'); reg.commit('drop schemas'); } });
+  s.reg.put({ [`entries/community/${ID}.json`]: '{ garbage' });
+  const out = await run(s);
+  assert.deepEqual(out.failed, [], out.messages);
+});
+
+test('a maintenance change passes the scope without entry checks', async () => {
+  const reg = makeRegistry();
+  const base = reg.git('rev-parse', 'HEAD');
+  reg.put({ 'README.md': '# changed\n', 'tools/x.mjs': 'export {};\n' });
+  reg.commit();
+  const plan = scope({ root: reg.root, base, author: 'ada' });
+  assert.equal(plan.mode, 'maintenance');
+  assert.deepEqual(plan.results.filter(r => !r.ok), []);
+  assert.equal(plan.items.length, 0);
+  assert.match(plan.hints.join(), /code owner review/);
+  const out = await verify(plan, tmp('work'));
+  assert.ok(out.ok);
 });
