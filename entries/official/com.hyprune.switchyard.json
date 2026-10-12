@@ -1,0 +1,24 @@
+{
+  "$schema": "https://hyprune.com/schema/registry/v0.1/index.schema.json#/$defs/entry",
+  "id": "com.hyprune.switchyard",
+  "type": "world",
+  "name": "Switchyard",
+  "summary": "A grand blue-hour transit terminal for six permanent project docks.",
+  "description": "A grand blue-hour transit terminal for six permanent project docks. Files arrive as cargo; applications dock as screens, beneath a bronze vault and an original rail-city vista.",
+  "creator": "hyprune",
+  "repo": "https://github.com/hyprune/worlds",
+  "versions": [
+    {
+      "tag": "switchyard-v0.1.2",
+      "version": "0.1.2",
+      "formatVersion": "0.5",
+      "published": "2026-10-11",
+      "license": "CC-BY-4.0",
+      "url": "https://github.com/hyprune/worlds/releases/download/switchyard-v0.1.2/com.hyprune.switchyard-0.1.2.tar.zst",
+      "sha256": "ef5097f40ef01a025c207c6971f09e8bcdf5f3680eed38e88c4c541e020a51ac",
+      "bytes": 58958161,
+      "expandedBytes": 75579013,
+      "files": 71
+    }
+  ]
+}
