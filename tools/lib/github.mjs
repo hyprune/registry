@@ -106,10 +106,11 @@ export async function download(url, path, { maxBytes = Infinity, timeoutMs = 300
   assertAllowedUrl(real);
   const ctl = new AbortController();
   let timer = setTimeout(() => ctl.abort(new Error('timeout')), timeoutMs);
-  const res = await fetch(real, { redirect: 'follow', signal: ctl.signal, headers: { 'user-agent': 'hyprune-registry-tools' } });
+  let res;
+  try { res = await fetch(real, { redirect: 'follow', signal: ctl.signal, headers: { 'user-agent': 'hyprune-registry-tools' } }); } catch (e) { clearTimeout(timer); throw e; }
   // Redirect targets must stay HTTPS (or loopback in tests).
-  assertAllowedUrl(res.url || real);
-  if (!res.ok) { clearTimeout(timer); throw new GitHubError(`download ${url}: HTTP ${res.status}`, res.status); }
+  try { assertAllowedUrl(res.url || real); } catch (e) { ctl.abort(); clearTimeout(timer); throw e; }
+  if (!res.ok) { clearTimeout(timer); await res.body?.cancel().catch(() => {}); throw new GitHubError(`download ${url}: HTTP ${res.status}`, res.status); }
   const contentLength = res.headers.get('content-length') === null ? null : Number(res.headers.get('content-length'));
   if (contentLength !== null && contentLength > maxBytes) { ctl.abort(); clearTimeout(timer); throw new Error(`download ${url}: Content-Length ${contentLength} exceeds ${maxBytes}`); }
   const hash = createHash('sha256');

@@ -38,7 +38,7 @@ export function buildIndexes({ root = defaultRoot, serial, generated } = {}) {
       const { $schema, ...clean } = entry;
       const hits = tombstoneHits(tombstones, clean);
       if (hits.length) {
-        warnings.push(...hits.map(h => `${file}: left out: ${h}`));
+        warnings.push(`${file}: left out: ${hits.join('; ')}`);
         const t = tombstones.get(clean.id);
         if (t?.versions === '*') continue;
         clean.versions = clean.versions.filter(v => !(t?.versions?.includes?.(v.version)) && ![...tombstones.values()].some(o => o.sha256.includes(v.sha256)));
