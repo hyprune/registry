@@ -1,0 +1,56 @@
+# Daily: regenerate entries/official/ from the meta repository's pins
+# (hyprune/hyprune worlds/releases.json and libraries/releases.json) and open a pull
+# request from the branch sync-official/pins when anything changed. The release
+# maintainers review it (CODEOWNERS). Needs the repository setting "Allow GitHub Actions
+# to create and approve pull requests".
+name: sync-official
+
+on:
+  schedule:
+    - cron: '41 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: sync-official
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - run: npm ci --prefix tools --ignore-scripts --no-audit --no-fund
+      - name: Sync from the pins
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node tools/sync-official.mjs --summary "$RUNNER_TEMP/summary.md"
+      - name: Open or update the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: sync-official/pins
+        run: |
+          cat "$RUNNER_TEMP/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          if [ -z "$(git status --porcelain entries/official)" ]; then echo "Official entries are up to date."; exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -C "$BRANCH"
+          git add entries/official
+          git commit -q -m "Sync official entries from the meta repository pins"
+          git push --force origin "$BRANCH"
+          if [ -z "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[].number')" ]; then
+            gh pr create --base main --head "$BRANCH" --title "Sync official entries" --body-file "$RUNNER_TEMP/summary.md"
+          else
+            gh pr edit "$BRANCH" --body-file "$RUNNER_TEMP/summary.md"
+          fi
+          gh workflow run check.yml --ref "$BRANCH"

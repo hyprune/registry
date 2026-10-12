@@ -1,0 +1,57 @@
+# Weekly re-verification of every listed version (RFC-0015): versions whose asset is gone
+# or changed, or whose tag moved or was deleted, become unavailable; community entries
+# unavailable for 30 days are removed with an `unavailable` tombstone. The changes go to
+# main through a pull request from the branch reverify/weekly (reviewed and merged like
+# any other change; publish.yml then publishes them). Needs the repository setting
+# "Allow GitHub Actions to create and approve pull requests".
+name: reverify
+
+on:
+  schedule:
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: reverify
+  cancel-in-progress: false
+
+jobs:
+  reverify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - run: npm ci --prefix tools --ignore-scripts --no-audit --no-fund
+      - name: Re-verify
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node tools/reverify.mjs --delay-ms 500 --summary "$RUNNER_TEMP/summary.md"
+      - name: Open or update the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: reverify/weekly
+        run: |
+          cat "$RUNNER_TEMP/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          if [ -z "$(git status --porcelain)" ]; then echo "Nothing changed."; exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -C "$BRANCH"
+          git add -A entries removed state
+          git commit -q -m "Re-verify listed versions ($(date -u +%F))"
+          git push --force origin "$BRANCH"
+          if [ -z "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[].number')" ]; then
+            gh pr create --base main --head "$BRANCH" --title "Re-verify listed versions" --body-file "$RUNNER_TEMP/summary.md"
+          else
+            gh pr edit "$BRANCH" --body-file "$RUNNER_TEMP/summary.md"
+          fi
+          gh workflow run check.yml --ref "$BRANCH"
