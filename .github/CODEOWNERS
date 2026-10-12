@@ -1,0 +1,8 @@
+# Official entries change only through the sync job's pull request, reviewed by the
+# release maintainers. Community entries are merged by the registry maintainers once
+# every check has passed on the final commit.
+*                       @hyprune/registry-maintainers
+/entries/official/      @hyprune/release-maintainers
+/tools/                 @hyprune/registry-maintainers
+/schema/                @hyprune/registry-maintainers
+/.github/               @hyprune/registry-maintainers

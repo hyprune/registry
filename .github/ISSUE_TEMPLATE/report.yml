@@ -1,0 +1,52 @@
+name: Report an entry
+description: Report a community registry entry (rights, licence, safety, content policy, broken, or a creator request). The link is removed at the first credible report.
+title: "Report: <id>"
+labels: ["report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The community registry only links to packages that their creators host. It does not
+        review content, so its one tool is removing the link. Don't put personal data or exploit
+        details here: send those to the security contact in the organisation's security policy.
+  - type: input
+    id: entry
+    attributes:
+      label: Entry id
+      description: The package id, for example io.github.ada.tidepool
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions (tags)
+      description: The affected tags, or "all"
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind of problem
+      options:
+        - rights
+        - licence
+        - safety
+        - content policy
+        - broken
+        - creator request
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What is the problem?
+      description: Enough to identify the entry and describe a plausible problem. The registry doesn't judge the claim.
+    validations:
+      required: true
+  - type: input
+    id: contact
+    attributes:
+      label: Contact
+      description: How maintainers can reach you if needed (a GitHub handle is enough).
+    validations:
+      required: true
