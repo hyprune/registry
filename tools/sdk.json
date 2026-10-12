@@ -1,5 +1,5 @@
 {
   "repository": "https://github.com/hyprune/sdk.git",
-  "commit": "0000000000000000000000000000000000000000",
+  "commit": "f6e24df0ce060840c5c454115ec893d55deb8122",
   "note": "The SDK commit the registry checks run with (registry module of RFC-0015). Replace with an exact commit; later an npm release pinned in package.json."
 }
