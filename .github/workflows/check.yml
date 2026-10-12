@@ -37,15 +37,16 @@ jobs:
       - name: Scope (git only)
         env:
           EVENT: ${{ github.event_name }}
-          PR_BASE: ${{ github.event.pull_request.base.sha }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           PR_ASSOCIATION: ${{ github.event.pull_request.author_association }}
           PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
           ACTOR: ${{ github.actor }}
           REF_NAME: ${{ github.ref_name }}
         run: |
+          # A pull_request run checks out the merge commit: its first parent is the base
+          # branch as merged, so the diff is exactly the pull request's change.
           if [ "$EVENT" = pull_request ]; then
-            base=$PR_BASE author=$PR_AUTHOR association=$PR_ASSOCIATION head_ref=$PR_HEAD_REF
+            base=HEAD^1 author=$PR_AUTHOR association=$PR_ASSOCIATION head_ref=$PR_HEAD_REF
           else
             base=origin/main author=$ACTOR association=NONE head_ref=$REF_NAME
           fi
