@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hyprune.com/schema/registry/v0.1/release-record.schema.json",
+  "title": "Hyprune release record 0.1 (RFC-0015): <id>-<version>.release.json, published with the archive of one tag",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "$ref": "index.schema.json#/$defs/https"
+    },
+    "recordVersion": {
+      "const": "0.1"
+    },
+    "type": {
+      "enum": [
+        "world",
+        "library"
+      ]
+    },
+    "id": {
+      "$ref": "index.schema.json#/$defs/id"
+    },
+    "version": {
+      "$ref": "index.schema.json#/$defs/version"
+    },
+    "formatVersion": {
+      "$ref": "index.schema.json#/$defs/formatVersion"
+    },
+    "name": {
+      "type": "string",
+      "$ref": "index.schema.json#/$defs/line",
+      "maxLength": 64
+    },
+    "license": {
+      "$ref": "index.schema.json#/$defs/license"
+    },
+    "archive": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 220,
+          "pattern": "^[a-z][a-z0-9.-]*-[0-9A-Za-z.-]+\\.tar\\.zst$"
+        },
+        "sha256": {
+          "$ref": "index.schema.json#/$defs/sha256"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 536870912
+        },
+        "expandedBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1073741824
+        },
+        "files": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        }
+      },
+      "required": [
+        "name",
+        "sha256",
+        "bytes",
+        "expandedBytes",
+        "files"
+      ],
+      "additionalProperties": false
+    },
+    "requires": {
+      "$ref": "index.schema.json#/$defs/requires"
+    },
+    "thumbnails": {
+      "type": "array",
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 220,
+            "pattern": "^[a-z][a-z0-9.-]*-[0-9A-Za-z.-]+\\.thumb-[1-4]\\.(png|jpg)$"
+          },
+          "sha256": {
+            "$ref": "index.schema.json#/$defs/sha256"
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1280
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 720
+          }
+        },
+        "required": [
+          "name",
+          "sha256",
+          "width",
+          "height"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "repo": {
+          "$ref": "index.schema.json#/$defs/https"
+        },
+        "tag": {
+          "$ref": "index.schema.json#/$defs/tag"
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$"
+        }
+      },
+      "required": [
+        "repo",
+        "tag",
+        "commit"
+      ],
+      "additionalProperties": false
+    },
+    "tool": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "$ref": "index.schema.json#/$defs/line",
+          "maxLength": 64
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[0-9A-Za-z.+-]+$"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ],
+      "additionalProperties": false
+    },
+    "checks": {
+      "description": "Informative: which local checks passed when the release was built. Clients never trust it.",
+      "type": "object",
+      "maxProperties": 16,
+      "propertyNames": {
+        "type": "string",
+        "maxLength": 32,
+        "pattern": "^[a-z][A-Za-z0-9]*$"
+      },
+      "additionalProperties": {
+        "enum": [
+          "pass",
+          "fail",
+          "skipped"
+        ]
+      }
+    }
+  },
+  "required": [
+    "recordVersion",
+    "type",
+    "id",
+    "version",
+    "formatVersion",
+    "name",
+    "license",
+    "archive",
+    "source"
+  ],
+  "additionalProperties": false
+}
