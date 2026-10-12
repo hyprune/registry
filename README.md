@@ -25,10 +25,12 @@ worlds and libraries contain no code, and installing one never runs anything.
    of them. Never replace or delete a published asset, and never move a tag: a fix is a new
    version. Enable GitHub's immutable releases if your account has them.
 2. **Write the entry.** `hyprune registry entry github:<owner>/<repo>@<tag>` prints
-   `entries/community/<id>.json` for a published release. Fill in `summary`, `description`
-   and `tags` if you want them.
+   `entries/community/<id>.json` for a published release (in a clone of this repository,
+   `node tools/make-entry.mjs github:<owner>/<repo>@<tag> --write` writes it). Fill in
+   `summary`, `description` and `tags` if you want them.
 3. **Check it locally.** `hyprune registry check entries/community/<id>.json` runs the same
-   checks as CI.
+   checks as CI (or, in a clone, `node tools/check-pr.mjs all --base origin/main --author
+   <your GitHub login>`; see [tools/README.md](tools/README.md)).
 4. **Open a pull request** that adds or changes exactly that one file. CI checks it; a
    maintainer merges once every check passes. Merging is not a content review.
 
@@ -38,7 +40,10 @@ and open another pull request. Existing versions never change.
 ### Rules the checks enforce
 
 - **You maintain the repository.** The pull request author must have write access to the
-  entry's `repo`. Nobody can list someone else's repository.
+  entry's `repo`. Nobody can list someone else's repository. CI can confirm this when you
+  are the repository's owner or the account that created the release of every new version
+  (GitHub only shows collaborator permissions to accounts with push access), so open the
+  pull request from one of those accounts.
 - **Ids.** `com.hyprune.*` is reserved for official entries. An id under
   `io.github.<owner>.` must belong to a repository owned by `<owner>`. Other ids are first
   come, first served, and stay with their repository.
@@ -100,12 +105,18 @@ Official entries are handled in the building repositories as ordinary bug or rig
 | `entries/official/<id>.json` | Official entries, written only by the sync job (`tools/sync-official.mjs`) from the meta repository's `worlds/releases.json` and `libraries/releases.json`. |
 | `entries/community/<id>.json` | One community entry per package: an index `entries[]` object with a `$schema` pointer. |
 | `removed/<id>.json` | Tombstones. |
+| `state/reverify.json` | The re-verification's memory: the commit each listed tag pointed to when first verified, and since when a version is unavailable. |
 | `schema/` | Pinned copies of the index and release record schemas (0.1). |
-| `tools/` | The checks, the index builder, the re-verifier and the official sync. |
+| `tools/` | The checks, the index builder, the re-verifier, the official sync and the entry writer ([tools/README.md](tools/README.md)). |
 | `.github/workflows/check.yml` | Pull request checks (`pull_request` only, read-only token, no other secrets). |
 | `.github/workflows/publish.yml` | On `main`: build both indexes and publish them to GitHub Pages. |
-| `.github/workflows/reverify.yml` | Weekly: re-download every listed version; mark missing or changed ones `unavailable`. |
+| `.github/workflows/reverify.yml` | Weekly: re-download every listed version; mark missing or changed ones `unavailable` and remove community entries unavailable for 30 days, through a pull request. |
 | `.github/workflows/sync-official.yml` | Daily and on demand: open a pull request when the meta repository's pins changed. |
+
+Pull requests from the sync and re-verification jobs are opened with the workflow token, so
+those jobs start `check.yml` for their branch themselves. Maintainers merge a community pull
+request only when it changes exactly one `entries/community/<id>.json` file (a pull request
+can change the workflows it runs; those changes need a code owner's review).
 
 Each publication's `serial` is the number of commits on `main`, so it only increases.
 
