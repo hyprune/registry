@@ -1,0 +1,43 @@
+{
+  "$schema": "https://hyprune.com/schema/registry/v0.1/index.schema.json#/$defs/entry",
+  "id": "io.github.rick-the-alien.drunk-ash",
+  "type": "library",
+  "name": "Drunk Ash",
+  "summary": "A Hyprune companion: a slightly unsteady fellow in a purple hoodie who follows you through every world, at his own pace.",
+  "creator": "rick-the-alien",
+  "repo": "https://github.com/rick-the-alien/hyprune-companion-drunk-ash",
+  "tags": [
+    "companion",
+    "character"
+  ],
+  "versions": [
+    {
+      "tag": "v0.1.0",
+      "version": "0.1.0",
+      "formatVersion": "0.10",
+      "published": "2026-10-13",
+      "license": "CC-BY-4.0",
+      "url": "https://github.com/rick-the-alien/hyprune-companion-drunk-ash/releases/download/v0.1.0/io.github.rick-the-alien.drunk-ash-0.1.0.tar.zst",
+      "sha256": "51492f77c08d28dc080fce5b85bd18e558cabe367f85faa16ef39bc901711983",
+      "bytes": 2125169,
+      "expandedBytes": 2370479,
+      "files": 6,
+      "record": {
+        "url": "https://github.com/rick-the-alien/hyprune-companion-drunk-ash/releases/download/v0.1.0/io.github.rick-the-alien.drunk-ash-0.1.0.release.json",
+        "sha256": "32c40965f7108f121b1bacb654ba3772ec4de0bd966cb52750c391508173a952"
+      },
+      "requires": {
+        "libraries": []
+      },
+      "thumbnails": [
+        {
+          "url": "https://github.com/rick-the-alien/hyprune-companion-drunk-ash/releases/download/v0.1.0/io.github.rick-the-alien.drunk-ash-0.1.0.thumb-1.png",
+          "sha256": "7cd31f5847bf0b938bddf9873873027b5faef0b3af1a8bec4687c06f72c58814",
+          "width": 640,
+          "height": 360
+        }
+      ],
+      "status": "available"
+    }
+  ]
+}
