@@ -1,6 +1,9 @@
 {
   "repository": "https://github.com/hyprune/schema",
-  "commit": "6bacaf0190f4c619e40653eebc35816d19dceed0",
+  "commit": "c694b361ced3e6ef8c694c4d4b802581caf1b469",
   "path": "registry/v0.1",
-  "files": ["index.schema.json", "release-record.schema.json"]
+  "files": [
+    "index.schema.json",
+    "release-record.schema.json"
+  ]
 }
