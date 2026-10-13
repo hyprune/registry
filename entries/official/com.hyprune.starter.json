@@ -3,10 +3,23 @@
   "id": "com.hyprune.starter",
   "type": "library",
   "name": "Hyprune starter kit",
-  "summary": "Official starter objects: the armillary, four ambient residents and five live machines with the item they move.",
+  "summary": "Official starter objects: the armillary, four ambient residents, five live machines with the item they move, and three gauges (tube…",
+  "description": "Official starter objects: the armillary, four ambient residents, five live machines with the item they move, and three gauges (tube, abacus, voxel cube) for any value from 0 to 100.",
   "creator": "hyprune",
   "repo": "https://github.com/hyprune/worlds",
   "versions": [
+    {
+      "tag": "hyprune-starter-v0.2.0",
+      "version": "0.2.0",
+      "formatVersion": "0.10",
+      "published": "2026-10-13",
+      "license": "CC-BY-4.0",
+      "url": "https://github.com/hyprune/worlds/releases/download/hyprune-starter-v0.2.0/com.hyprune.starter-0.2.0.tar.zst",
+      "sha256": "c5708f151ea25d4233c31f729cc18be45284e388abed5bbe9c134d29467b4963",
+      "bytes": 14880430,
+      "expandedBytes": 18533128,
+      "files": 77
+    },
     {
       "tag": "hyprune-starter-v0.1.1",
       "version": "0.1.1",
