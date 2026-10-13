@@ -103,4 +103,4 @@ jobs:
       - name: Test
         env:
           HYPRUNE_REGISTRY_SDK: ${{ runner.temp }}/sdk
-        run: node --test tools/test/
+        run: node --test 'tools/test/*.test.mjs'
