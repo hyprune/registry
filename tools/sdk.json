@@ -1,5 +1,5 @@
 {
   "repository": "https://github.com/hyprune/sdk.git",
-  "commit": "28999167161fdc0bbf86a4858439d115afbcc28c",
-  "note": "The SDK commit the registry checks run with: @hyprune/sdk 0.9.0 (registry module of RFC-0015)."
+  "commit": "65dae9836740c28728114a796af4fc35e0ee6d7c",
+  "note": "The SDK commit the registry checks run with: @hyprune/sdk 0.12.0 (object format 0.11, motion packs)."
 }
