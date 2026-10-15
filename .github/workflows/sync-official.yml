@@ -1,5 +1,5 @@
 # Daily: regenerate entries/official/ from the meta repository's pins
-# (hyprune/hyprune worlds/releases.json and libraries/releases.json) and open a pull
+# (hyprune/hyprune worlds/releases.json, libraries/releases.json and libraries/optional.json) and open a pull
 # request from the branch sync-official/pins when anything changed. The release
 # maintainers review it (CODEOWNERS). Needs the repository setting "Allow GitHub Actions
 # to create and approve pull requests".

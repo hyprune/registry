@@ -102,7 +102,7 @@ Official entries are handled in the building repositories as ordinary bug or rig
 
 | Path | What |
 | --- | --- |
-| `entries/official/<id>.json` | Official entries, written only by the sync job (`tools/sync-official.mjs`) from the meta repository's `worlds/releases.json` and `libraries/releases.json`. |
+| `entries/official/<id>.json` | Official entries, written only by the sync job (`tools/sync-official.mjs`) from the meta repository's `worlds/releases.json`, `libraries/releases.json` and `libraries/optional.json` (official libraries that are not preinstalled). |
 | `entries/community/<id>.json` | One community entry per package: an index `entries[]` object with a `$schema` pointer. |
 | `removed/<id>.json` | Tombstones. |
 | `state/reverify.json` | The re-verification's memory: the commit each listed tag pointed to when first verified, and since when a version is unavailable. |
