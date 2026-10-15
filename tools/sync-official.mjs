@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Write entries/official/<id>.json from the meta repository's pins
-// (worlds/releases.json and libraries/releases.json).
+// (worlds/releases.json, libraries/releases.json and libraries/optional.json: official
+// libraries that are listed but not preinstalled).
 //
 // For every published pin: the tag comes from the pinned URL
 // (…/releases/download/<tag>/<asset>) and must name the pinned version; the pin's sha256
@@ -15,7 +16,7 @@
 // is never rewritten: a pin that changes the hash of a listed tag is an error.
 //
 // Usage: node tools/sync-official.mjs [--root DIR] [--worlds PATH|URL] [--libraries PATH|URL]
-//          [--summary FILE]
+//          [--optional PATH|URL] [--summary FILE]
 import { mkdtempSync, existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -26,7 +27,8 @@ import { scanArchive } from './lib/tar.mjs';
 import { validateEntry, validateRecord, compareSemver, tagVersion, limits } from './lib/validate.mjs';
 
 const META_RAW = 'https://raw.githubusercontent.com/hyprune/hyprune/main';
-export const DEFAULT_PINS = { world: `${META_RAW}/worlds/releases.json`, library: `${META_RAW}/libraries/releases.json` };
+export const DEFAULT_PINS = { world: `${META_RAW}/worlds/releases.json`, library: `${META_RAW}/libraries/releases.json`,
+  optional: `${META_RAW}/libraries/optional.json` };
 
 export const nixHashOf = hex => `sha256-${Buffer.from(hex, 'hex').toString('base64')}`;
 
@@ -125,9 +127,11 @@ export async function syncOfficial({ root = defaultRoot, pins = DEFAULT_PINS, gh
   const work = mkdtempSync(join(tmpdir(), 'hyprune-sync-'));
   const changed = [], errors = [], notes = [];
   try {
-    for (const type of ['world', 'library']) {
+    // Optional libraries (not preinstalled) are library pins of their own file.
+    for (const [type, where] of [['world', pins.world], ['library', pins.library], ['library', pins.optional]]) {
+      if (!where) continue;
       let doc;
-      try { doc = await readPins(pins[type]); } catch (e) { errors.push(`${pins[type]}: ${e.message}`); continue; }
+      try { doc = await readPins(where); } catch (e) { errors.push(`${where}: ${e.message}`); continue; }
       for (const [key, pin] of Object.entries(doc)) {
         if (pin?.published === false) { notes.push(`${key}: not published, skipped`); continue; }
         const label = `${type} pin ${key}`;
@@ -180,12 +184,12 @@ export async function syncOfficial({ root = defaultRoot, pins = DEFAULT_PINS, gh
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const root = resolve(args.root ?? defaultRoot);
-  const pins = { world: args.worlds ?? DEFAULT_PINS.world, library: args.libraries ?? DEFAULT_PINS.library };
+  const pins = { world: args.worlds ?? DEFAULT_PINS.world, library: args.libraries ?? DEFAULT_PINS.library, optional: args.optional ?? DEFAULT_PINS.optional };
   const result = await syncOfficial({ root, pins });
   for (const n of result.notes) annotate('notice', n);
   for (const e of result.errors) annotate('error', e);
   if (args.summary) {
-    const lines = ['Official entries synced from the meta repository pins (`worlds/releases.json`, `libraries/releases.json`).', ''];
+    const lines = ['Official entries synced from the meta repository pins (`worlds/releases.json`, `libraries/releases.json`, `libraries/optional.json`).', ''];
     for (const n of result.notes) lines.push(`- ${n}`);
     for (const e of result.errors) lines.push(`- **error:** ${e}`);
     writeFileSync(args.summary, lines.join('\n') + '\n');

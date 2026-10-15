@@ -1,6 +1,9 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { rmSync } from 'node:fs';
+import { rmSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { githubClient } from '../lib/github.mjs';
+import { syncOfficial, nixHashOf } from '../sync-official.mjs';
 import { startFakeGitHub } from '../test-support/fake-github.mjs';
 import { makeRelease, makeRegistry, entryFor, tmp } from '../test-support/fixtures.mjs';
 import { scope, fetchFacts, verify, classify } from '../check-pr.mjs';
@@ -173,6 +176,9 @@ test('official entries change only through the sync job', () => {
   const files = [{ status: 'M', path: 'entries/official/com.hyprune.x.json' }];
   assert.match(classify(files, { author: 'ada', headRef: 'sync-official/x' }).errors.join(), /only through the official sync job/);
   assert.deepEqual(classify(files, { author: 'github-actions[bot]', headRef: 'sync-official/2026-10-12' }), { mode: 'official', errors: [] });
+  // A maintainer may open it from the pushed branch; then the entries must match a fresh sync.
+  assert.deepEqual(classify(files, { author: 'lead', association: 'MEMBER', headRef: 'sync-official/pins' }), { mode: 'official', errors: [], syncMatch: true });
+  assert.match(classify(files, { author: 'ada', association: 'NONE', headRef: 'sync-official/pins' }).errors.join(), /only through the official sync job/);
   assert.match(classify(files, { author: 'github-actions[bot]', headRef: 'other' }).errors.join(), /only through the official sync job/);
   const two = [{ status: 'A', path: 'entries/community/a.b.json' }, { status: 'A', path: 'tools/x.mjs' }];
   assert.match(classify(two, { author: 'ada' }).errors.join(), /exactly one/);
@@ -299,4 +305,38 @@ test('a maintenance change passes the scope without entry checks', async () => {
   assert.match(plan.hints.join(), /code owner review/);
   const out = await verify(plan, tmp('work'));
   assert.ok(out.ok);
+});
+
+test('a maintainer-opened sync-official/* pull request passes only when it equals a fresh sync at its base', async () => {
+  const OID = 'com.hyprune.kit';
+  const rel = makeRelease({ owner: 'hyprune', repo: 'worlds', id: OID, version: '0.1.0', tag: 'kit-v0.1.0', name: 'Hyprune kit', thumbnails: 0 });
+  const repo = (gh.repos['hyprune/worlds'] ??= { owner: { login: 'hyprune', type: 'Organization' }, tags: {}, releases: [] });
+  repo.tags[rel.tag] = rel.commit;
+  repo.releases.push(rel.release);
+  gh.files['/raw/sm-libraries.json'] = JSON.stringify({ [`${OID}@0.1.0`]: { id: OID, version: '0.1.0', formatVersion: '0.9', url: rel.versionEntry.url,
+    sha256: rel.versionEntry.sha256, nixHash: nixHashOf(rel.versionEntry.sha256), published: true } });
+  gh.files['/raw/sm-worlds.json'] = '{}';
+  const syncPins = { world: `${gh.url}/raw/sm-worlds.json`, library: `${gh.url}/raw/sm-libraries.json` };
+  const reg = makeRegistry();
+  const base = reg.git('rev-parse', 'HEAD');
+  await syncOfficial({ root: reg.root, pins: syncPins, gh: githubClient() });
+  reg.commit('Sync official entries from the meta repository pins');
+  const check = async () => {
+    const plan = scope({ root: reg.root, base, author: 'lead', association: 'MEMBER', headRef: 'sync-official/pins' });
+    assert.equal(plan.mode, 'official');
+    assert.equal(plan.syncMatch, true);
+    assert.deepEqual(plan.results.filter(r => !r.ok), []);
+    const work = tmp('work');
+    await fetchFacts(plan, work, { gh: githubClient(), syncPins });
+    return JSON.parse(readFileSync(join(work, 'facts.json'), 'utf8')).sync;
+  };
+  assert.deepEqual(await check(), { differs: [], errors: [] });
+  // Edited by hand: the diff names the file.
+  const path = join(reg.root, 'entries/official', `${OID}.json`);
+  reg.put({ [`entries/official/${OID}.json`]: { ...JSON.parse(readFileSync(path, 'utf8')), summary: 'Edited by hand' } });
+  reg.commit();
+  assert.match((await check()).differs.join(), /com\.hyprune\.kit\.json differs from the sync/);
+  // From anyone without write access, the branch name doesn't help.
+  const other = scope({ root: reg.root, base, author: 'ada', association: 'NONE', headRef: 'sync-official/pins' });
+  assert.ok(other.results.some(r => r.check === 0 && !r.ok));
 });

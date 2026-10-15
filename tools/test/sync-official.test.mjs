@@ -19,10 +19,11 @@ function publish(rel, { record = true } = {}) {
   repo.tags[rel.tag] = rel.commit;
   repo.releases.push({ ...rel.release, assets: rel.release.assets.filter(a => record || !a.name.endsWith('.release.json')) });
 }
-const pins = (libraries, worlds = {}) => {
+const pins = (libraries, worlds = {}, optional = undefined) => {
   gh.files['/raw/libraries.json'] = JSON.stringify(libraries);
   gh.files['/raw/worlds.json'] = JSON.stringify(worlds);
-  return { world: `${gh.url}/raw/worlds.json`, library: `${gh.url}/raw/libraries.json` };
+  if (optional) gh.files['/raw/optional.json'] = JSON.stringify(optional);
+  return { world: `${gh.url}/raw/worlds.json`, library: `${gh.url}/raw/libraries.json`, ...(optional ? { optional: `${gh.url}/raw/optional.json` } : {}) };
 };
 
 test('writes an official entry from the pins, with the release record and thumbnails', async () => {
@@ -92,4 +93,21 @@ test('summaries stay within 140 characters', () => {
   const words = 'word '.repeat(60);
   const s = summarize(words);
   assert.ok(s.length <= 140 && s.endsWith('…'));
+});
+
+test('optional library pins (libraries/optional.json) become official library entries too', async () => {
+  const OPT = 'com.hyprune.extras';
+  const rel = makeRelease({ owner: 'hyprune', repo: 'worlds', id: OPT, version: '0.1.0', tag: 'extras-v0.1.0', name: 'Hyprune extras' });
+  publish(rel);
+  const reg = makeRegistry();
+  const optPin = { ...pin(rel), id: OPT };
+  const out = await syncOfficial({ root: reg.root, pins: pins({}, {}, { [`${OPT}@0.1.0`]: optPin }), gh: githubClient() });
+  assert.deepEqual(out.errors, []);
+  assert.deepEqual(out.changed, [`entries/official/${OPT}.json`]);
+  const entry = JSON.parse(readFileSync(join(reg.root, 'entries/official', `${OPT}.json`), 'utf8'));
+  assert.equal(entry.type, 'library');
+  assert.deepEqual(validateEntry(entry), []);
+  // Without an optional source nothing else is read.
+  const none = await syncOfficial({ root: reg.root, pins: pins({}, {}), gh: githubClient() });
+  assert.deepEqual(none.errors, []);
 });

@@ -1,8 +1,8 @@
 # Daily: regenerate entries/official/ from the meta repository's pins
-# (hyprune/hyprune worlds/releases.json and libraries/releases.json) and open a pull
-# request from the branch sync-official/pins when anything changed. The release
-# maintainers review it (CODEOWNERS). Needs the repository setting "Allow GitHub Actions
-# to create and approve pull requests".
+# (hyprune/hyprune worlds/releases.json, libraries/releases.json and libraries/optional.json) and push
+# the branch sync-official/pins when anything changed. The organisation doesn't let Actions
+# open pull requests, so a release maintainer opens it from that branch; the check accepts it
+# when entries/official/ equals a fresh sync at its base (tools/check-pr.mjs, check 15).
 name: sync-official
 
 on:
@@ -12,7 +12,7 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
+  pull-requests: read
   actions: write
 
 concurrency:
@@ -35,7 +35,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node tools/sync-official.mjs --summary "$RUNNER_TEMP/summary.md"
-      - name: Open or update the pull request
+      - name: Push the branch
         env:
           GH_TOKEN: ${{ github.token }}
           BRANCH: sync-official/pins
@@ -49,8 +49,7 @@ jobs:
           git commit -q -m "Sync official entries from the meta repository pins"
           git push --force origin "$BRANCH"
           if [ -z "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[].number')" ]; then
-            gh pr create --base main --head "$BRANCH" --title "Sync official entries" --body-file "$RUNNER_TEMP/summary.md"
-          else
-            gh pr edit "$BRANCH" --body-file "$RUNNER_TEMP/summary.md"
+            echo "::notice::Pushed $BRANCH: a maintainer opens the pull request (gh pr create -R $GITHUB_REPOSITORY --head $BRANCH --title 'Sync official entries')"
+            echo "Pushed \`$BRANCH\`: open the pull request from it (Actions may not open pull requests here)." >> "$GITHUB_STEP_SUMMARY"
           fi
           gh workflow run check.yml --ref "$BRANCH"
