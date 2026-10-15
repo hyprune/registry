@@ -8,6 +8,42 @@
   "repo": "https://github.com/hyprune/worlds",
   "versions": [
     {
+      "tag": "lumen-reach-v0.12.0",
+      "version": "0.12.0",
+      "formatVersion": "0.9",
+      "published": "2026-10-15",
+      "license": "CC-BY-4.0",
+      "url": "https://github.com/hyprune/worlds/releases/download/lumen-reach-v0.12.0/com.hyprune.lumen-reach-0.12.0.tar.zst",
+      "sha256": "bf0f16e55190adfcc8ebc5605a224f879ee689901b638c7842deea26136e2547",
+      "bytes": 55436563,
+      "expandedBytes": 62730239,
+      "files": 100,
+      "record": {
+        "url": "https://github.com/hyprune/worlds/releases/download/lumen-reach-v0.12.0/com.hyprune.lumen-reach-0.12.0.release.json",
+        "sha256": "50fd3c810d23b607b2a625b9cacc8f9d2be2cbf7a9915a4e9516cc773dcf313d"
+      },
+      "thumbnails": [
+        {
+          "url": "https://github.com/hyprune/worlds/releases/download/lumen-reach-v0.12.0/com.hyprune.lumen-reach-0.12.0.thumb-1.png",
+          "sha256": "5707c50f5a4a5e0a233bcc991b74d12c19f2f45d1fb0336abb5866202aa54d22",
+          "width": 1280,
+          "height": 720
+        }
+      ]
+    },
+    {
+      "tag": "lumen-reach-v0.11.3",
+      "version": "0.11.3",
+      "formatVersion": "0.9",
+      "published": "2026-10-14",
+      "license": "CC-BY-4.0",
+      "url": "https://github.com/hyprune/worlds/releases/download/lumen-reach-v0.11.3/com.hyprune.lumen-reach-0.11.3.tar.zst",
+      "sha256": "30ee724f5b6029b022039f9fe512c0f4f19ca83f432eafee22c6d1895f8579a6",
+      "bytes": 53768087,
+      "expandedBytes": 60097498,
+      "files": 95
+    },
+    {
       "tag": "lumen-reach-v0.11.0",
       "version": "0.11.0",
       "formatVersion": "0.9",
