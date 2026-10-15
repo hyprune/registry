@@ -111,7 +111,7 @@ Official entries are handled in the building repositories as ordinary bug or rig
 | `.github/workflows/check.yml` | Pull request checks (`pull_request` only, read-only token, no other secrets). |
 | `.github/workflows/publish.yml` | On `main`: build both indexes and publish them to GitHub Pages. |
 | `.github/workflows/reverify.yml` | Weekly: re-download every listed version; mark missing or changed ones `unavailable` and remove community entries unavailable for 30 days, through a pull request. |
-| `.github/workflows/sync-official.yml` | Daily and on demand: open a pull request when the meta repository's pins changed. |
+| `.github/workflows/sync-official.yml` | Daily and on demand: push `sync-official/pins` when the meta repository's pins changed; a release maintainer opens the pull request from it, and the check accepts it when `entries/official/` equals a fresh sync at its base (check 15). |
 
 Pull requests from the sync and re-verification jobs are opened with the workflow token, so
 those jobs start `check.yml` for their branch themselves. The checks always run the tools and

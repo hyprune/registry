@@ -18,8 +18,11 @@
 //
 // Change kinds (scope):
 //   community  exactly one entries/community/<id>.json added or changed (any author).
-//   official   only entries/official/*.json, opened by github-actions[bot] from a
-//              sync-official/* branch (the sync job).
+//   official   only entries/official/*.json from a sync-official/* branch: pushed by the
+//              sync job (github-actions[bot]), or opened by a repository owner, member or
+//              collaborator from that branch, in which case entries/official/ must equal
+//              what tools/sync-official.mjs (the base's) produces at the base: the fetch
+//              step re-runs the sync and verify diffs it (check 15).
 //   removal    entries/community/<id>.json deleted or reduced plus removed/<id>.json, by a
 //              repository owner, member or collaborator (the report process).
 //   reverify   status changes, unavailable removals and state/reverify.json, opened by
@@ -52,7 +55,7 @@ import { namingAdvice } from './lib/naming.mjs';
 export const CHECKS = {
   1: 'Entry schema', 2: 'Id and ownership', 3: 'Tag and release', 4: 'Download and size', 5: 'Hashes',
   6: 'Record agreement', 7: 'Safe extraction', 8: 'Data only', 9: 'Package validation', 10: 'Declared licence',
-  11: 'Requirements', 12: 'Thumbnails', 13: 'Removed', 14: 'Version history', 0: 'Change scope',
+  11: 'Requirements', 12: 'Thumbnails', 13: 'Removed', 14: 'Version history', 15: 'Official sync match', 0: 'Change scope',
 };
 const BOT = 'github-actions[bot]';
 const PROTECTED = /^(tools|schema|\.github)\//;
@@ -103,10 +106,12 @@ export function classify(files, { author, association, headRef = '' }) {
   const paths = files.map(f => f.path);
   const entryFile = /^entries\/(official|community)\/([^/]+)\.json$/;
   if (!files.length) return { mode: null, errors: ['the pull request changes no files'] };
-  if (bot && headRef.startsWith('sync-official/')) {
+  // The sync job pushes sync-official/*; a maintainer opens the pull request (the organisation
+  // doesn't let Actions open them). Then the entries must match a fresh sync (syncMatch).
+  if (headRef.startsWith('sync-official/') && (bot || MAINTAINER_ASSOCIATIONS.includes(association))) {
     const bad = files.filter(f => !/^entries\/official\/[^/]+\.json$/.test(f.path) || f.status === 'D');
     if (bad.length) errors.push(`the official sync may only add or change entries/official/*.json (not ${bad.map(f => f.path).join(', ')})`);
-    return { mode: 'official', errors };
+    return { mode: 'official', errors, ...(bot ? {} : { syncMatch: true }) };
   }
   if (bot && headRef.startsWith('reverify/')) {
     const ok = f => (entryFile.test(f.path) && (f.status === 'M' || (f.status === 'D' && f.path.startsWith('entries/community/'))))
@@ -119,7 +124,7 @@ export function classify(files, { author, association, headRef = '' }) {
   const protectedPaths = paths.filter(p => PROTECTED.test(p));
   if (protectedPaths.length) errors.push(`${protectedPaths.join(', ')}: tools, schemas and workflows change only in a separate maintenance pull request (code owner review), never together with entries`);
   const official = paths.filter(p => p.startsWith('entries/official/'));
-  if (official.length) errors.push(`entries/official/ changes only through the official sync job (${official.join(', ')})`);
+  if (official.length) errors.push(`entries/official/ changes only through the official sync job: its sync-official/* branch, opened by a maintainer (${official.join(', ')})`);
   const removed = files.filter(f => /^removed\/[^/]+\.json$/.test(f.path));
   if (removed.length) {
     const ids = new Set(files.map(f => (/^(?:entries\/community|removed)\/([^/]+)\.json$/.exec(f.path) ?? [])[1]));
@@ -193,9 +198,10 @@ export function entryChecks(item, ctx, r) {
 export function scope({ root, base, head = 'HEAD', author, association, headRef }) {
   const diff = git(root, ['diff', '--name-status', '--no-renames', `${base}...${head}`]).trim();
   const files = diff ? diff.split('\n').map(l => { const [status, path] = l.split('\t'); return { status: status[0], path }; }) : [];
-  const { mode, errors } = classify(files, { author, association, headRef });
+  const { mode, errors, syncMatch } = classify(files, { author, association, headRef });
   const r = results();
-  const plan = { mode, base, head: git(root, ['rev-parse', head]).trim(), author, association, headRef, items: [], results: r.list, warnings: [], hints: [] };
+  const plan = { mode, base, head: git(root, ['rev-parse', head]).trim(), author, association, headRef, items: [], results: r.list, warnings: [], hints: [],
+    ...(syncMatch ? { syncMatch: true, root } : {}) };
   if (errors.length) { for (const e of errors) r.fail(0, e); return plan; }
   r.pass(0, `${mode} change: ${files.map(f => `${f.status} ${f.path}`).join(', ')}`);
   if (mode === 'maintenance') { plan.hints.push(MAINTENANCE_NOTE); return plan; }
@@ -258,8 +264,31 @@ async function safeDownload(url, path, maxBytes) {
   }
 }
 
-export async function fetchFacts(plan, work, { gh = githubClient({ delayMs: 100 }) } = {}) {
+/** entries/official/ of a fresh sync at the base vs the head: {differs, errors}. */
+async function syncDiff(plan, work, { gh, pins }) {
+  const { syncOfficial, DEFAULT_PINS } = await import('./sync-official.mjs');
+  const tree = mkdtempSync(join(work, 'sync-'));
+  spawnSync('sh', ['-c', 'git -C "$1" archive "$2" | tar -x -C "$3"', 'sh', plan.root, plan.base, tree], { stdio: 'inherit' });
+  const out = await syncOfficial({ root: tree, pins: pins ?? DEFAULT_PINS, gh });
+  const names = dir => new Set(existsSync(dir) ? readdirSync(dir).filter(n => n.endsWith('.json')) : []);
+  const want = names(join(tree, 'entries/official'));
+  let have = [];
+  try { have = git(plan.root, ['ls-tree', '--name-only', `${plan.head}:entries/official`]).split('\n').filter(n => n.endsWith('.json')); } catch { /* none */ }
+  const differs = [];
+  for (const n of new Set([...want, ...have])) {
+    const a = want.has(n) ? readFileSync(join(tree, 'entries/official', n), 'utf8') : null;
+    const b = have.includes(n) ? gitShow(plan.root, plan.head, `entries/official/${n}`) : null;
+    if (a === null) differs.push(`entries/official/${n} is not produced by the sync`);
+    else if (b === null) differs.push(`entries/official/${n} is produced by the sync but missing`);
+    else if (a !== b) differs.push(`entries/official/${n} differs from the sync's`);
+  }
+  rmSync(tree, { recursive: true, force: true });
+  return { differs, errors: out.errors };
+}
+
+export async function fetchFacts(plan, work, { gh = githubClient({ delayMs: 100 }), syncPins } = {}) {
   const facts = { items: {} };
+  if (plan.syncMatch) facts.sync = await syncDiff(plan, work, { gh, pins: syncPins });
   for (const item of plan.items) {
     const { entry } = item;
     const repo = githubRepo(entry.repo);
@@ -484,7 +513,14 @@ export async function verify(plan, work) {
   const r = results();
   r.list.push(...plan.results);
   const warnings = [...plan.warnings], hints = [...plan.hints];
-  const facts = plan.items.length ? readJson(join(work, 'facts.json')) : { items: {} };
+  const facts = existsSync(join(work, 'facts.json')) ? readJson(join(work, 'facts.json')) : { items: {} };
+  // 15: a maintainer-opened sync-official/* pull request equals a fresh sync at its base.
+  if (plan.syncMatch) {
+    const s = facts.sync;
+    if (!s) r.fail(15, 'the fresh sync did not run (fetch step)');
+    else if (s.errors.length || s.differs.length) r.fail(15, [...s.errors.map(e => `sync error: ${e}`), ...s.differs].join('; '));
+    else r.pass(15, 'entries/official/ equals a fresh sync at the base');
+  }
   const sdk = plan.items.some(i => i.newTags.length) ? await (await import('./lib/sdk.mjs')).loadSdk() : null;
   const tmp = mkdtempSync(join(work, 'staging-'));
   const stage = { work, tmp, worldCheck: worldCheckBinary() };
