@@ -64,6 +64,9 @@ function validator(ref, root) {
 }
 
 function entryRules(entry, label, fail) {
+  // extension is reserved in the schema (RFC-0007 process extensions): no client installs
+  // one yet, so the registry lists none until an extension host exists.
+  if (!limits[entry.type]) return fail(`${label}type ${entry.type} is reserved: the registry lists worlds and libraries until an extension host exists`);
   const lim = limits[entry.type];
   const tags = new Set(), versions = new Set();
   entry.versions.forEach((v, i) => {
