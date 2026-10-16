@@ -251,9 +251,11 @@
           "$ref": "#/$defs/id"
         },
         "type": {
+          "description": "world and library are installable. extension is reserved for RFC-0007 process extensions: no extension host exists yet, so clients skip extension entries (never list or install them), and the official and community registries accept none.",
           "enum": [
             "world",
-            "library"
+            "library",
+            "extension"
           ]
         },
         "name": {
