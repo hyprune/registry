@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "entries": {
+    "com.hyprune.companions": {
+      "hyprune-companions-v0.1.0": {
+        "commit": "4ffbb1425d0bb207b85116b02306be65d51a34c2"
+      }
+    },
+    "com.hyprune.lumen-reach": {
+      "lumen-reach-v0.12.0": {
+        "commit": "8dc38528266789f3182be8a8a233b7e1d4b19d1e"
+      },
+      "lumen-reach-v0.11.0": {
+        "commit": "a991ab470843a191a28d0c2e2faed29d16034d50"
+      },
+      "lumen-reach-v0.10.3": {
+        "commit": "d155516c848f2b2e8ea9791861a62cccd536563c"
+      }
+    },
+    "com.hyprune.starter": {
+      "hyprune-starter-v0.3.0": {
+        "commit": "18fdcd357b3507fa7c9cbf5bf9d4af7210fa5b4b"
+      },
+      "hyprune-starter-v0.2.0": {
+        "commit": "82b714f05de7127278d2fe1f31c020a3d904e710"
+      },
+      "hyprune-starter-v0.1.1": {
+        "commit": "1b08b0bbf49ba6e730acd3e2e80611eba04041f7"
+      },
+      "hyprune-starter-v0.1.0": {
+        "commit": "596d0f914fcc0ab23e4273e3860632f5cfd13e70"
+      }
+    },
+    "com.hyprune.switchyard": {
+      "switchyard-v0.1.2": {
+        "commit": "e5ca75462dde87fd8ea56ae5b2e4526da6f5647b"
+      }
+    },
+    "io.github.rick-the-alien.drunk-ash": {
+      "v0.1.0": {
+        "commit": "8dd2948ecf730b1b2c6dfab28da430bb4112bebc"
+      }
+    }
+  }
+}
